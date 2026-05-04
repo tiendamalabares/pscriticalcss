@@ -1,83 +1,50 @@
-name: Build & Release draft
-on: [push, pull_request]
+name: Build ZIP
+
+on:
+  push:
+    branches: ['**']
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  deploy:
-    name: build dependencies & create artifact
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4.2.2
 
-      - name: Setup PHP 7.4
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '7.4'
-
-      - name: Install composer dependencies
-        run: composer install --no-dev -o
-
-      - name: Clean-up project
-        uses: PrestaShopCorp/github-action-clean-before-deploy@v2.0
-        with:
-          paths: node_modules
-
-      - name: Clean-up node_modules directory
-        run: sudo rm -rf node_modules
-
-      - name: Clean-up .ddev directory
-        run: sudo rm -rf .ddev
-
-      - name: Prepare auto-index tool
-        run: composer global require prestashop/autoindex
-
-      - name: Generate index.php
-        run: ~/.composer/vendor/bin/autoindex
-
-      - name: Create & upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ github.event.repository.name }}
-          path: /home/runner/work/pscriticalcss/
-
-  update_release_draft:
-    runs-on: ubuntu-latest
-    needs: [deploy]
-    if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ github.event.repository.name }}
-
-      - id: release_info
-        uses: toolmantim/release-drafter@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Prepare for Release
+      - name: Extraer versión del módulo
+        id: get_version
         run: |
-          cd ${{ github.event.repository.name }}
-          zip -r ${{ github.event.repository.name }}-${{ github.event.release.tag_name }}.zip ${{ github.event.repository.name }} -x '*.git*'
+          VERSION=$(grep -oP '\$this->version\s*=\s*\047\K[^\047]*(?=\047)' pscriticalcss.php | head -1)
+          [ -z "$VERSION" ] && VERSION=$(grep -oP '\$this->version\s*=\s*"\K[^"]*(?=")' pscriticalcss.php | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "{\"version\":\"$VERSION\"}" > version.json
+          echo "{\"version\":\"$VERSION\"}" > ../version.json
 
-      - name: Clean existing assets
-        shell: bash
+      - name: Crear ZIP con carpeta raíz correcta
         run: |
-          curl -fsSL https://github.com/github/hub/raw/master/script/get | bash -s 2.14.1
-          assets=`bin/hub api -t repos/${{ github.repository }}/releases/${{ steps.release_info.outputs.id }}/assets | awk '/\].url/ { print $2 }'`
-          for asset in $assets
-          do
-              bin/hub api -X DELETE $asset
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cd ..
+          zip -r pscriticalcss.zip pscriticalcss/ \
+            --exclude "pscriticalcss/.git/*" \
+            --exclude "pscriticalcss/.github/*" \
+            --exclude "pscriticalcss/.gitignore" \
+            --exclude "pscriticalcss/tests/*" \
+            --exclude "pscriticalcss/playwright.config.js" \
+            --exclude "pscriticalcss/package*.json"
 
-      - name: Publish to GitHub Release
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publicar ZIP en Release "latest"
+        uses: softprops/action-gh-release@v2.3.2
         with:
-          upload_url: ${{ steps.release_info.outputs.upload_url }}
-          asset_path: ./${{ github.event.repository.name }}/${{ github.event.repository.name }}-${{ github.event.release.tag_name }}.zip
-          asset_name: ${{ github.event.repository.name }}-${{ github.event.release.tag_name }}.zip
-          asset_content_type: application/zip
+          tag_name: latest
+          name: "v${{ steps.get_version.outputs.version }}"
+          prerelease: true
+          files: |
+            ../pscriticalcss.zip
+            ../version.json
