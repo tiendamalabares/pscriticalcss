@@ -39,7 +39,7 @@ jobs:
             --exclude "pscriticalcss/playwright.config.js" \
             --exclude "pscriticalcss/package*.json"
 
-      - name: Publicar ZIP en Release \"latest\"
+      - name: Publicar ZIP en Release "latest"
         uses: softprops/action-gh-release@v2.3.2
         with:
           tag_name: latest
