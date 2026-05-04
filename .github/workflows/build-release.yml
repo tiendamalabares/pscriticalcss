@@ -19,6 +19,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
 
+      - name: Setup PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      - name: Instalar dependencias (dist, sin dev)
+        run: composer install --no-dev -o --prefer-dist
+
+      - name: Parchear vendor/autoload.php para evitar duplicidades
+        run: |
+          php -r "
+          \$file = 'vendor/autoload.php';
+          \$content = file_get_contents(\$file);
+          preg_match('/ComposerAutoloaderInit[a-f0-9]+/', \$content, \$matches);
+          if (!empty(\$matches)) {
+            \$class = \$matches[0];
+            \$content = str_replace(
+              \"require_once __DIR__ . '/composer/autoload_real.php';\",
+              \"if (!class_exists('\$class', false)) {\\n    require_once __DIR__ . '/composer/autoload_real.php';\\n}\",
+              \$content
+            );
+            file_put_contents(\$file, \$content);
+          }
+          "
+
       - name: Extraer versión del módulo
         id: get_version
         run: |
@@ -36,6 +61,11 @@ jobs:
             --exclude "pscriticalcss/.github/*" \
             --exclude "pscriticalcss/.gitignore" \
             --exclude "pscriticalcss/tests/*" \
+            --exclude "pscriticalcss/.ddev/*" \
+            --exclude "pscriticalcss/.php-cs-fixer*" \
+            --exclude "pscriticalcss/.editorconfig" \
+            --exclude "pscriticalcss/docker-compose.yml" \
+            --exclude "pscriticalcss/Makefile" \
             --exclude "pscriticalcss/playwright.config.js" \
             --exclude "pscriticalcss/package*.json"
 
