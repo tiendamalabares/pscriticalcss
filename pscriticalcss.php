@@ -42,7 +42,7 @@ class Pscriticalcss extends Module
     {
         $this->name = 'pscriticalcss';
         $this->tab = 'content_management';
-        $this->version = '0.1.0';
+        $this->version = '0.1.1';
         $this->author = 'PickleBoxer';
         $this->need_instance = 0;
 
