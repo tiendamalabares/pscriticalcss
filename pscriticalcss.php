@@ -34,7 +34,7 @@ class Pscriticalcss extends Module
     protected $config_form = false;
 
     /**
-     * @var object CriticalCss
+     * @var CriticalCss|null
      */
     protected $criticalCss;
 
@@ -57,11 +57,6 @@ class Pscriticalcss extends Module
         $this->description = $this->l('Critical CSS module for PrestaShop optimizes website loading times');
 
         $this->ps_versions_compliancy = ['min' => '1.7', 'max' => _PS_VERSION_];
-
-        $this->criticalCss = new CriticalCss(
-            _PS_THEME_DIR_ . 'assets/cache/',
-            new Filesystem()
-        );
     }
 
     /**
@@ -213,7 +208,22 @@ class Pscriticalcss extends Module
             // Get the class name of the current controller
             $controllerName = $this->context->controller->php_self;
 
-            $params['html'] = $this->criticalCss->process($params['html'], $controllerName);
+            $params['html'] = $this->getCriticalCss()->process($params['html'], $controllerName);
         }
+    }
+
+    /**
+     * Returns the CriticalCss instance, creating it on first use.
+     */
+    protected function getCriticalCss(): CriticalCss
+    {
+        if ($this->criticalCss === null) {
+            $this->criticalCss = new CriticalCss(
+                _PS_THEME_DIR_ . 'assets/cache/',
+                new Filesystem()
+            );
+        }
+
+        return $this->criticalCss;
     }
 }
